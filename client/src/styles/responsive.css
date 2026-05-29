@@ -1,0 +1,163 @@
+@media (max-width: 1500px) {
+  .app-shell {
+    grid-template-columns: 72px minmax(0, 1fr);
+  }
+
+  .brand-logo,
+  .nav-item span,
+  .theme-select,
+  .collapse-control {
+    display: none;
+  }
+
+  .brand-row {
+    justify-content: center;
+    padding: 0;
+  }
+
+  .nav-list {
+    padding-inline: 10px;
+  }
+
+  .nav-item {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    padding: 0;
+  }
+
+  .summary-grid {
+    grid-template-columns: minmax(210px, 1fr) minmax(310px, 1.6fr) minmax(180px, 0.9fr) minmax(220px, 1fr);
+  }
+}
+
+@media (max-width: 1320px) {
+  .overview-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .right-rail {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 1180px) {
+  .lower-dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1040px) {
+  .summary-grid,
+  .quick-metric-grid,
+  .right-rail {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .lower-dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .top-actions {
+    gap: 8px;
+  }
+
+  .search-box {
+    width: 190px;
+  }
+
+  .performance-header {
+    align-items: start;
+    min-height: 104px;
+  }
+
+  .trend-tabs {
+    right: 12px;
+    flex-wrap: wrap;
+  }
+
+  .trend-tabs button {
+    min-width: auto;
+    padding: 0 10px;
+  }
+
+  .time-tabs {
+    position: absolute;
+    right: 12px;
+    top: 12px;
+  }
+}
+
+@media (max-width: 760px) {
+  .app-shell {
+    display: block;
+  }
+
+  .sidebar {
+    display: none;
+  }
+
+  .top-bar {
+    position: static;
+    height: auto;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px;
+    flex-direction: column;
+  }
+
+  .sidebar-toggle {
+    display: inline-grid;
+  }
+
+  .top-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .search-box {
+    flex: 1 1 210px;
+    width: auto;
+  }
+
+  .dashboard-page {
+    padding: 10px;
+  }
+
+  .summary-grid,
+  .quick-metric-grid,
+  .lower-dashboard-grid,
+  .right-rail {
+    grid-template-columns: 1fr;
+  }
+
+  .topology-toolbar {
+    display: none;
+  }
+
+  .topology-canvas {
+    height: 360px;
+  }
+
+  .topology-legend {
+    left: 12px;
+    right: 12px;
+    bottom: 10px;
+    justify-content: flex-start;
+  }
+
+  .performance-header {
+    min-height: 104px;
+  }
+
+  .trend-tabs {
+    right: 12px;
+    flex-wrap: wrap;
+  }
+
+  .time-tabs {
+    position: absolute;
+    right: 12px;
+    top: 12px;
+  }
+}
+

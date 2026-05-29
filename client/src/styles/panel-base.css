@@ -1,0 +1,22 @@
+.panel {
+  overflow: hidden;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.panel-header h2 {
+  min-width: 0;
+}
+
+.panel-body {
+  min-height: 0;
+}
+

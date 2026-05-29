@@ -1,0 +1,241 @@
+.topology-panel {
+  height: 356px;
+}
+
+.topology-header {
+  min-height: 54px;
+}
+
+.topology-header h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.topology-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  min-width: 0;
+}
+
+.topology-toolbar button {
+  height: 28px;
+  gap: 8px;
+  padding: 0 11px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: #fff;
+  font-size: 11px;
+}
+
+.topology-toolbar button:nth-last-child(-n + 3) {
+  width: 28px;
+  padding: 0;
+}
+
+.topology-canvas {
+  position: relative;
+  height: 302px;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(248, 250, 252, 0.3), rgba(255, 255, 255, 0.98)),
+    var(--surface);
+}
+
+.topology-links {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.topology-link {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.3;
+}
+
+.topology-link.control {
+  stroke: rgba(255, 90, 31, 0.72);
+  stroke-dasharray: 3 4;
+}
+
+.topology-link.user {
+  stroke: rgba(255, 90, 31, 0.88);
+}
+
+.topology-link-label {
+  fill: #283241;
+  font-size: 10px;
+}
+
+.gnb-block,
+.topology-node,
+.dn-cloud {
+  position: absolute;
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  background: linear-gradient(180deg, #ffffff, #f7f9fb);
+}
+
+.gnb-block strong {
+  font-size: 11px;
+}
+
+.gnb-block {
+  top: 54%;
+  left: 2.31%;
+  display: grid;
+  place-items: center;
+  width: clamp(68px, 8.27%, 86px);
+  height: 96px;
+  color: #10151c;
+}
+
+.topology-node {
+  display: grid;
+  grid-template-columns: 1fr 14px;
+  align-items: center;
+  min-width: 0;
+  z-index: 2;
+  padding: 0 10px;
+  color: #1c2430;
+  cursor: pointer;
+  transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease, background 150ms ease;
+}
+
+.topology-node strong {
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: 760;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topology-node i {
+  width: 11px;
+  height: 11px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+}
+
+.topology-node.node-healthy {
+  color: var(--green);
+  background: linear-gradient(180deg, #fbfffc, #f3fbf5);
+}
+
+.topology-node.node-warning {
+  color: var(--orange);
+  border-color: #ffc3a8;
+  background: linear-gradient(180deg, #fffaf7, #fff0e9);
+}
+
+.topology-node.node-critical {
+  color: var(--red);
+  background: #fff8f7;
+}
+
+.topology-node strong {
+  color: #1d2430;
+}
+
+.topology-node:hover,
+.topology-node.is-selected {
+  transform: translateY(-1px);
+  border-color: currentColor;
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.09);
+}
+
+.dn-cloud {
+  top: 67.88%;
+  right: 2.3%;
+  display: grid;
+  place-items: center;
+  width: clamp(78px, 9.23%, 96px);
+  height: 56px;
+  border-radius: 30px;
+  color: #111827;
+}
+
+.dn-cloud::before,
+.dn-cloud::after {
+  content: "";
+  position: absolute;
+  border: 1px solid var(--border-strong);
+  border-bottom: 0;
+  border-radius: 50% 50% 0 0;
+  background: linear-gradient(180deg, #ffffff, #f7f9fb);
+}
+
+.dn-cloud::before {
+  top: -19px;
+  left: 20px;
+  width: 50px;
+  height: 34px;
+}
+
+.dn-cloud::after {
+  top: -9px;
+  left: 4px;
+  width: 36px;
+  height: 25px;
+}
+
+.dn-cloud span,
+.dn-cloud small {
+  position: relative;
+  z-index: 1;
+}
+
+.dn-cloud span {
+  font-size: 13px;
+  font-weight: 760;
+}
+
+.dn-cloud small {
+  font-size: 10px;
+}
+
+.topology-legend {
+  position: absolute;
+  left: clamp(124px, 17.31%, 180px);
+  right: clamp(64px, 7.69%, 80px);
+  bottom: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 5px clamp(10px, 2vw, 24px);
+  color: #3f4856;
+  font-size: 10px;
+}
+
+.topology-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.legend-line {
+  display: inline-block;
+  width: 26px;
+  height: 1.4px;
+  border-radius: 2px;
+}
+
+.legend-line.control {
+  background: repeating-linear-gradient(90deg, var(--orange) 0 4px, transparent 4px 8px);
+}
+
+.legend-line.user {
+  background: var(--orange);
+}
+
