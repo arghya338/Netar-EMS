@@ -1,0 +1,5 @@
+{
+  "requestTimeoutMs": 20000,
+  "sessionCookieName": "netar.sid",
+  "mutationsEnabled": false
+}

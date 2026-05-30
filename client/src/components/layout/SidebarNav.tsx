@@ -8,7 +8,7 @@ interface SidebarNavProps {
 export function SidebarNav({ activeNav, onSelect }: SidebarNavProps) {
   return (
     <nav className="nav-list" aria-label="EMS navigation">
-        {overviewNavigation.map((item) => {
+      {overviewNavigation.map((item) => {
         const Icon = item.icon;
         const active = item.label === activeNav;
 

@@ -6,10 +6,13 @@ import {
   Home,
   LineChart,
   Network,
+  Router,
   Settings,
   ShieldAlert,
   UserRound,
   Wrench,
+  Terminal,
+  SlidersHorizontal,
 } from 'lucide-react';
 import type {
   ActiveFunctionSummary,
@@ -29,14 +32,16 @@ import type {
 export const overviewNavigation: NavigationItem[] = [
   { label: 'Overview', icon: Home },
   { label: 'Topology', icon: CircleDot },
-  { label: 'Network Functions', icon: Boxes },
-  { label: 'Alarms & Events', icon: ShieldAlert },
-  { label: 'Performance', icon: LineChart },
-  { label: 'Slices', icon: Network },
-  { label: 'Subscribers', icon: UserRound },
-  { label: 'Analytics', icon: BarChart3 },
-  { label: 'Reports', icon: Bell },
+  { label: 'Network Elements', icon: Boxes },
+  { label: 'NE Configuration', icon: SlidersHorizontal },
   { label: 'Maintenance', icon: Wrench },
+  { label: 'Performance', icon: LineChart },
+  { label: 'Sessions', icon: Network },
+  { label: 'Subscribers', icon: UserRound },
+  { label: 'Policy', icon: Router },
+  { label: 'Alarms', icon: ShieldAlert },
+  { label: 'Diagnostics', icon: Terminal },
+  { label: 'Reports', icon: Bell },
   { label: 'Settings', icon: Settings },
 ];
 
