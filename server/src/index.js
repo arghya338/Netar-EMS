@@ -155,6 +155,366 @@ async function upstreamRequest({ method, targetPath, query, token, body }) {
   }
 }
 
+function toPositiveInt(value, fallback, min, max) {
+  const parsed = Number.parseInt(String(value ?? ''), 10);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(max, Math.max(min, parsed));
+}
+
+function sqlString(value) {
+  return `'${String(value).replace(/'/g, "''")}'`;
+}
+
+function mapAlarmStatus(value) {
+  const normalized = String(value ?? 'Active').trim().toLowerCase();
+  if (normalized === 'active' || normalized === '1') return '1';
+  if (normalized === 'clear' || normalized === 'cleared' || normalized === '0') return '0';
+  throw new Error('Invalid alarmStatus filter');
+}
+
+function readEnumFilter(query, name, allowedValues) {
+  const value = query.get(name);
+  if (!value) return null;
+  const match = allowedValues.find((allowed) => allowed.toLowerCase() === value.toLowerCase());
+  if (!match) {
+    throw new Error(`Invalid ${name} filter`);
+  }
+  return match;
+}
+
+function readCodeFilter(query, name) {
+  const value = query.get(name);
+  if (!value) return null;
+  if (!/^[a-zA-Z0-9_-]{1,64}$/.test(value)) {
+    throw new Error(`Invalid ${name} filter`);
+  }
+  return value;
+}
+
+const severityFilterValues = new Map([
+  ['critical', ['Critical', 'dictData.active_alarm_severity.critical']],
+  ['major', ['Major', 'dictData.active_alarm_severity.major']],
+  ['minor', ['Minor', 'dictData.active_alarm_severity.minor']],
+  ['warning', ['Warning', 'dictData.active_alarm_severity.warning']],
+  ['event', ['Event', 'dictData.active_alarm_severity.event']],
+]);
+
+const alarmTypeFilterValues = new Map([
+  ['communicationalarm', ['CommunicationAlarm', 'dictData.active_alarm_type.communication']],
+  ['communication', ['CommunicationAlarm', 'dictData.active_alarm_type.communication']],
+  ['equipmentalarm', ['EquipmentAlarm', 'dictData.active_alarm_type.equipment']],
+  ['equipment', ['EquipmentAlarm', 'dictData.active_alarm_type.equipment']],
+  ['processingfailure', ['ProcessingFailure', 'dictData.active_alarm_type.processingFailure', 'dictData.active_alarm_type.processing_failure']],
+  ['environmentalalarm', ['EnvironmentalAlarm', 'dictData.active_alarm_type.environmental']],
+  ['environmental', ['EnvironmentalAlarm', 'dictData.active_alarm_type.environmental']],
+  ['qualityofservicealarm', ['QualityOfServiceAlarm', 'dictData.active_alarm_type.qualityOfService', 'dictData.active_alarm_type.quality_of_service']],
+  ['qualityofservice', ['QualityOfServiceAlarm', 'dictData.active_alarm_type.qualityOfService', 'dictData.active_alarm_type.quality_of_service']],
+]);
+
+function enumLookupKey(value) {
+  return String(value ?? '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function readMappedFilter(query, name, allowedValues) {
+  const value = query.get(name);
+  if (!value) return null;
+  const mapped = allowedValues.get(enumLookupKey(value));
+  if (!mapped) {
+    throw new Error(`Invalid ${name} filter`);
+  }
+  return mapped;
+}
+
+function sqlIn(column, values) {
+  const uniqueValues = Array.from(new Set(values));
+  return uniqueValues.length === 1
+    ? `${column}=${sqlString(uniqueValues[0])}`
+    : `${column} in (${uniqueValues.map(sqlString).join(',')})`;
+}
+
+function buildAlarmWhere(query) {
+  const conditions = [`alarm_status=${sqlString(mapAlarmStatus(query.get('alarmStatus')) )}`];
+  const neType = readCodeFilter(query, 'neType');
+  const alarmCode = readCodeFilter(query, 'alarmCode');
+  const severity = readMappedFilter(query, 'origSeverity', severityFilterValues);
+  const alarmType = readMappedFilter(query, 'alarmType', alarmTypeFilterValues);
+
+  if (neType) conditions.push(`ne_type=${sqlString(neType)}`);
+  if (alarmCode) conditions.push(`alarm_code=${sqlString(alarmCode)}`);
+  if (severity) conditions.push(sqlIn('orig_severity', severity));
+  if (alarmType) conditions.push(sqlIn('alarm_type', alarmType));
+
+  return conditions.join(' and ');
+}
+
+function unwrapDatabaseRows(envelope, tableName = 'alarm') {
+  const dataItems = Array.isArray(envelope?.data) ? envelope.data : [];
+  return dataItems
+    .map((item) => item?.[tableName])
+    .filter(Array.isArray);
+}
+
+function firstNumber(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+async function upstreamJson({ method = 'GET', targetPath, query, token, body }) {
+  const upstream = await upstreamRequest({
+    method,
+    targetPath,
+    query,
+    token,
+    body,
+  });
+  return {
+    status: upstream.status,
+    envelope: parseEnvelope(upstream.text, upstream.contentType),
+  };
+}
+
+async function selectAlarmDatabase(token, sql, rowsSql) {
+  const query = new URLSearchParams({ SQL: sql });
+  if (rowsSql) {
+    query.set('rowsSQL', rowsSql);
+  }
+
+  const response = await upstreamJson({
+    targetPath: '/api/rest/databaseManagement/v1/select/omc_db/alarm',
+    query,
+    token,
+  });
+
+  if (response.status >= 400) {
+    throw new Error(response.envelope?.msg ?? `Upstream alarm database request failed with HTTP ${response.status}`);
+  }
+
+  return response.envelope;
+}
+
+async function fetchAlarmDictionary(token, dictType) {
+  const response = await upstreamJson({
+    targetPath: `/system/dict/data/type/${dictType}`,
+    query: new URLSearchParams(),
+    token,
+  });
+
+  const rows = Array.isArray(response.envelope?.data) ? response.envelope.data : [];
+  return new Map(rows.map((row) => [String(row.dictValue), String(row.dictLabel)]));
+}
+
+async function fetchAlarmDictionaries(token) {
+  const [alarmType, clearType, ackState, severity] = await Promise.all([
+    fetchAlarmDictionary(token, 'active_alarm_type'),
+    fetchAlarmDictionary(token, 'active_clear_type'),
+    fetchAlarmDictionary(token, 'active_ack_state'),
+    fetchAlarmDictionary(token, 'active_alarm_severity'),
+  ]);
+
+  return {
+    alarmType,
+    clearType,
+    ackState,
+    severity,
+  };
+}
+
+function dictLabel(dictionary, value) {
+  const key = String(value ?? '').trim();
+  if (!key) return '';
+  const direct = dictionary.get(key);
+  return direct && !isRawDictKey(direct) ? direct : key;
+}
+
+function isRawDictKey(value) {
+  return String(value ?? '').trim().toLowerCase().startsWith('dictdata.');
+}
+
+function alarmStatusLabel(value) {
+  const key = String(value ?? '');
+  if (key === '1') return 'Active';
+  if (key === '0') return 'Clear';
+  return key;
+}
+
+const severityLabelFallbacks = new Map([
+  ['critical', 'Critical'],
+  ['major', 'Major'],
+  ['minor', 'Minor'],
+  ['warning', 'Warning'],
+  ['event', 'Event'],
+]);
+
+const alarmTypeLabelFallbacks = new Map([
+  ['communication', 'Communication Alarm'],
+  ['communicationalarm', 'Communication Alarm'],
+  ['equipment', 'Equipment Alarm'],
+  ['equipmentalarm', 'Equipment Alarm'],
+  ['processingfailure', 'Processing Failure Alarm'],
+  ['environmental', 'Environmental Alarm'],
+  ['environmentalalarm', 'Environmental Alarm'],
+  ['qualityofservice', 'Quality of Service Alarm'],
+  ['qualityofservicealarm', 'Quality of Service Alarm'],
+]);
+
+function dictTail(value) {
+  const key = String(value ?? '').trim();
+  return enumLookupKey(key.split('.').pop() ?? key);
+}
+
+function dictLabelWithFallback(dictionary, fallbacks, value) {
+  const key = String(value ?? '').trim();
+  if (!key) return '';
+  const direct = dictionary.get(key);
+  return (direct && !isRawDictKey(direct) ? direct : undefined)
+    ?? fallbacks.get(enumLookupKey(key))
+    ?? fallbacks.get(dictTail(key))
+    ?? key;
+}
+
+function normalizeAlarmRow(row, dictionaries) {
+  const alarmTypeCode = String(row.alarm_type ?? '');
+  const severityCode = String(row.orig_severity ?? row.perceived_severity ?? '');
+  const clearTypeCode = String(row.clear_type ?? '');
+  const ackStateCode = String(row.ack_state ?? '');
+
+  return {
+    id: row.id,
+    alarmId: row.alarm_id,
+    alarmSeq: row.alarm_seq,
+    alarmCode: row.alarm_code,
+    alarmTitle: row.alarm_title || row.specific_problem,
+    alarmType: dictLabelWithFallback(dictionaries.alarmType, alarmTypeLabelFallbacks, alarmTypeCode),
+    alarmTypeCode,
+    alarmStatus: alarmStatusLabel(row.alarm_status),
+    alarmStatusCode: row.alarm_status,
+    origSeverity: dictLabelWithFallback(dictionaries.severity, severityLabelFallbacks, severityCode),
+    origSeverityCode: severityCode,
+    perceivedSeverity: row.perceived_severity,
+    neType: row.ne_type,
+    neId: row.ne_id,
+    neName: row.ne_name,
+    objectName: row.object_name,
+    objectType: row.object_type,
+    objectUid: row.object_uid,
+    eventTime: row.event_time,
+    latestEventTime: row.latest_event_time,
+    clearTime: row.clear_time,
+    clearType: dictLabel(dictionaries.clearType, clearTypeCode),
+    clearTypeCode,
+    clearUser: row.clear_user,
+    ackState: dictLabel(dictionaries.ackState, ackStateCode),
+    ackStateCode,
+    ackTime: row.ack_time,
+    ackUser: row.ack_user,
+    counter: row.counter,
+    addInfo: row.add_info,
+    locationInfo: row.location_info,
+    specificProblem: row.specific_problem,
+    specificProblemId: row.specific_problem_id,
+    timestamp: row.timestamp,
+  };
+}
+
+async function handleInternalAlarmList(req, res, headers, url) {
+  if (req.method !== 'GET') {
+    sendJson(res, 405, { code: 405, msg: 'Method not allowed' }, headers);
+    return;
+  }
+
+  const session = currentSession(req);
+  if (!session) {
+    sendJson(res, 401, { code: 401, msg: 'Session expired' }, headers);
+    return;
+  }
+
+  try {
+    const pageNum = toPositiveInt(url.searchParams.get('pageNum'), 1, 1, 100000);
+    const pageSize = toPositiveInt(url.searchParams.get('pageSize'), 50, 1, 200);
+    const offset = (pageNum - 1) * pageSize;
+    const where = buildAlarmWhere(url.searchParams);
+    const countSql = `select count(*) as total from alarm where ${where}`;
+    const rowsSql = `select * from alarm where ${where} order by event_time desc limit ${offset},${pageSize}`;
+    const [databaseEnvelope, dictionaries] = await Promise.all([
+      selectAlarmDatabase(session.token, countSql, rowsSql),
+      fetchAlarmDictionaries(session.token),
+    ]);
+    const collections = unwrapDatabaseRows(databaseEnvelope);
+    const total = firstNumber(collections[0]?.[0]?.total);
+    const rows = (collections[1] ?? []).map((row) => normalizeAlarmRow(row, dictionaries));
+
+    sendJson(res, 200, {
+      code: 1,
+      msg: 'success',
+      data: {
+        rows,
+        total,
+      },
+    }, headers);
+  } catch (error) {
+    sendJson(res, 400, {
+      code: 400,
+      msg: error instanceof Error ? error.message : 'Alarm adapter failed',
+    }, headers);
+  }
+}
+
+async function handleInternalAlarmCount(req, res, headers, url, group) {
+  if (req.method !== 'GET') {
+    sendJson(res, 405, { code: 405, msg: 'Method not allowed' }, headers);
+    return;
+  }
+
+  const session = currentSession(req);
+  if (!session) {
+    sendJson(res, 401, { code: 401, msg: 'Session expired' }, headers);
+    return;
+  }
+
+  try {
+    const where = buildAlarmWhere(url.searchParams);
+    const top = toPositiveInt(url.searchParams.get('top'), 8, 1, 50);
+    const dictionaries = await fetchAlarmDictionaries(session.token);
+    let sql;
+    let rows;
+
+    if (group === 'severity') {
+      sql = `select orig_severity, count(*) as total from alarm where ${where} group by orig_severity`;
+      rows = unwrapDatabaseRows(await selectAlarmDatabase(session.token, sql))[0] ?? [];
+      rows = rows.map((row) => ({
+        severity: dictLabelWithFallback(dictionaries.severity, severityLabelFallbacks, row.orig_severity),
+        origSeverity: dictLabelWithFallback(dictionaries.severity, severityLabelFallbacks, row.orig_severity),
+        origSeverityCode: row.orig_severity,
+        total: firstNumber(row.total),
+      }));
+    } else if (group === 'type') {
+      sql = `select alarm_type, count(*) as total from alarm where ${where} group by alarm_type`;
+      rows = unwrapDatabaseRows(await selectAlarmDatabase(session.token, sql))[0] ?? [];
+      rows = rows.map((row) => ({
+        alarmType: dictLabelWithFallback(dictionaries.alarmType, alarmTypeLabelFallbacks, row.alarm_type),
+        alarmTypeCode: row.alarm_type,
+        total: firstNumber(row.total),
+      }));
+    } else {
+      sql = `select ne_type, ne_id, ne_name, count(*) as total from alarm where ${where} group by ne_type, ne_id, ne_name order by total desc limit 0,${top}`;
+      rows = unwrapDatabaseRows(await selectAlarmDatabase(session.token, sql))[0] ?? [];
+      rows = rows.map((row) => ({
+        neType: row.ne_type,
+        neId: row.ne_id,
+        neName: row.ne_name,
+        total: firstNumber(row.total),
+      }));
+    }
+
+    sendJson(res, 200, { code: 1, msg: 'success', data: rows }, headers);
+  } catch (error) {
+    sendJson(res, 400, {
+      code: 400,
+      msg: error instanceof Error ? error.message : 'Alarm count adapter failed',
+    }, headers);
+  }
+}
+
 function parseEnvelope(text, contentType) {
   if (!text) return {};
   if (!contentType.includes('application/json')) return { data: text };
@@ -297,6 +657,26 @@ const server = http.createServer(async (req, res) => {
 
     if (url.pathname === '/api/logout' && req.method === 'POST') {
       await handleLogout(req, res, headers);
+      return;
+    }
+
+    if (url.pathname === '/api/internal/alarm/list') {
+      await handleInternalAlarmList(req, res, headers, url);
+      return;
+    }
+
+    if (url.pathname === '/api/internal/alarm/count/severity') {
+      await handleInternalAlarmCount(req, res, headers, url, 'severity');
+      return;
+    }
+
+    if (url.pathname === '/api/internal/alarm/count/type') {
+      await handleInternalAlarmCount(req, res, headers, url, 'type');
+      return;
+    }
+
+    if (url.pathname === '/api/internal/alarm/count/ne') {
+      await handleInternalAlarmCount(req, res, headers, url, 'ne');
       return;
     }
 

@@ -40,6 +40,7 @@ export function AppShell({ session, onSessionEnd }: AppShellProps) {
           activeNav={activeNav}
           searchQuery={searchQuery}
           session={session}
+          onNavigate={setActiveNav}
         />
       </main>
     </div>
